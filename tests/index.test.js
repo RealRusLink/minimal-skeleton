@@ -1,7 +1,10 @@
-import { expect, test, describe } from "vitest"
-import {sayHello} from "../src/index.ts"
+import { expect, test, describe, vi } from "vitest";
+import { sayHello } from "../src/index.ts";
 
-
-test("Testing sayHello", () => {
-    expect(sayHello("Ruslan")).toBe(undefined)
-})
+describe("Testing sayHello", () => {
+    test("Should say hello to ruslan", () => {
+        using consoleLogSpy = vi.spyOn(console, "log");
+        expect(sayHello("Ruslan")).toBe(undefined);
+        expect(consoleLogSpy).toHaveBeenCalledWith("Hello, Ruslan");
+    });
+});
