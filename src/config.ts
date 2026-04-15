@@ -17,24 +17,27 @@ export const GLOBAL_CONFIG = {
 function checkConfig
 (obj:
  Record<string, any>,
+ objName:
+ string,
  handler:
  Function =
- (obj: Record<string, any>, key: keyof typeof obj): void => {
-     throw new Error(`${key} is ${obj[key]}`)
+ (obj: Record<string, any>, objName: string, key: keyof typeof obj): void => {
+     throw new Error(`${objName}.${key} is ${obj[key]}`)
  }
 ): void {
     let key: keyof typeof obj;
     for (key in obj) {
         if (obj[key] === undefined || obj[key] === null || Number.isNaN(obj[key]) || obj[key] === "") {
-            handler(obj, key);
+            handler(obj, objName, key);
         }
         if (typeof obj[key] === "object"){
-            checkConfig(obj[key]);
+            console.log(`Checking ${objName}.${key}..`)
+            checkConfig(obj[key], key);
         }
-        console.log(`${key} is checked`)
+        console.log(`${objName}.${key} is checked`)
     }
 }
 
-checkConfig(GLOBAL_CONFIG);
+checkConfig(GLOBAL_CONFIG, 'GLOBAL_CONFIG');
 
 export default GLOBAL_CONFIG
