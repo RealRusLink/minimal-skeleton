@@ -5,25 +5,26 @@
   "license": "ISC",
   "author": "",
   "type": "module",
-  "main": "server.ts",
+  "main": "app.ts",
   "scripts": {
     "test": "vitest run",
     "test:db": "vitest",
     "build": "tsc -p tsconfig.json",
-    "start": "node ./dist/server.js",
-    "fast": "npm run build && timeout 5 && npm run start"
+    "start": "node ./dist/app.js",
+    "fast": "npm run build && timeout 5 && npm run start",
+    "clearn": "powershell -Command \"Get-ChildItem -Path ./src -Include *.js -Recurse | Remove-Item -Force\""
   },
   "devDependencies": {
-    "@types/jest": "^30.0.0",
     "@types/node": "^25.6.0",
     "@types/pg": "^8.20.0",
     "typescript": "^6.0.2",
     "vitest": "^4.1.4"
   },
   "dependencies": {
-    "@fastify/static": "^9.1.0",
+    "@hono/node-server": "^2.0.0",
     "dotenv": "^17.4.2",
-    "fastify": "^5.8.4",
+    "hono": "^4.12.14",
+    "logger": "github:RealRusLink/logger",
     "pg": "^8.20.0"
   }
 }
