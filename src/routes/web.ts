@@ -1,16 +1,21 @@
-import Fastify, {type FastifyInstance, type FastifyReply, type FastifyRequest} from "fastify";
-import {fastifyStatic} from "@fastify/static";
-import * as path from "node:path";
-import GLOBAL_CONFIG from "../config.js";
-/**
- * Registers src/public as public
- */
-export async function registerWeb(server: FastifyInstance): Promise<void> {
+import {type Context, Hono} from "hono";
+import {existsSync} from "node:fs";
+import {resolve} from "node:path";
+import {serveStatic} from "@hono/node-server/serve-static";
+import type {Config} from "../config.js";
 
-    await server.register(fastifyStatic, {
-        root: path.join(process.cwd(), GLOBAL_CONFIG.webPath),
-        prefix: "/"
-    })
+export class Web extends Hono {
 
+    constructor(GlobalConfig: Config) {
+        super();
+
+        const absolutePath = resolve(GlobalConfig.webPath);
+
+        if (!existsSync(absolutePath)) {
+            throw new Error(`webPath ${GlobalConfig.webPath} doesn't exist`);
+        }
+        this.use("/*", serveStatic({ root: GlobalConfig.webPath }));
+    }
 }
-export default registerWeb
+
+export default {Web}
