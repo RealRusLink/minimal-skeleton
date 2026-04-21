@@ -1,19 +1,12 @@
-import Fastify from "fastify";
-import registerApi from "./routes/api.js";
-import registerWeb from "./routes/web.js";
-import GLOBAL_CONFIG from "./config.js";
-const server = Fastify();
+import {serve} from "@hono/node-server";
+import type {Routes} from "./routes/index.js";
+import type {Config} from "./config.js";
 
-
-await registerWeb(server);
-await registerApi(server);
-
-server.listen({port: GLOBAL_CONFIG.listenPort},
-    (error, address) => {
-        if (error) {
-            console.log(error);
-        } else {
-            console.log("Server running on ", address)
-        }
-
-    });
+export class Server {
+    constructor(AppRoutes: Routes, GlobalConfig: Config) {
+        serve({
+            fetch: AppRoutes.fetch,
+            port: GlobalConfig.listenPort
+        })
+    }
+}
