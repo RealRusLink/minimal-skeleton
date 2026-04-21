@@ -22,7 +22,7 @@ export class Config extends ConfigBase{
 
 
     constructor() {
-        dotenv.config({quiet: true})
+        dotenv.config({quiet: true, path: "../.env"})
         super()
         this.webPath = process.env.WEB_PATH || "";
         this.listenPort = Number(process.env.LISTEN_PORT || 80);
