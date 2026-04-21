@@ -1,0 +1,74 @@
+import {DatabaseError} from "pg";
+
+export type ErrorType = "BusinessError" | "InfrastructureError" | "DBError"
+
+export class BusinessError extends Error{
+    type: ErrorType = "BusinessError";
+    constructor() {
+        super();
+    }
+}
+
+export class InfrastructureError extends Error{
+    type: ErrorType = "InfrastructureError"
+    constructor() {
+        super();
+    }
+}
+
+
+
+export class DBError extends InfrastructureError{
+    static DBErrorCodeMap: Record<string, string> = {
+        '08000': 'Connection exception',
+        '08003': 'Connection does not exist',
+        '08006': 'Connection failure',
+        '08P01': 'Protocol violation',
+        '23000': 'Integrity constraint violation',
+        '23502': 'Not null violation',
+        '23503': 'Foreign key violation',
+        '23505': 'Unique violation (Duplicate key)',
+        '23514': 'Check constraint violation',
+        '28P01': 'Authentication failed',
+        '42000': 'Syntax error or access rule violation',
+        '42601': 'Syntax error',
+        '42501': 'Insufficient privilege',
+        '42703': 'Undefined column',
+        '42P01': 'Undefined table',
+        '0A000': 'Feature not supported',
+        '53100': 'Disk full',
+        '53200': 'Out of memory',
+        '53300': 'Too many connections',
+        '57014': 'Query canceled',
+        '57P01': 'Admin shutdown',
+        '57P03': 'Cannot connect now (Server is in recovery)',
+        'XX000': 'Internal error',
+        'Unknown error': 'Unknown error'
+    }
+
+    table: string | undefined;
+    detail: string | undefined;
+    hiddenStack: string;
+    constructor(Error: DatabaseError) {
+        super();
+        this.type = "DBError"
+        this.hiddenStack = Error.stack || "";
+        this.name = "DBError";
+        this.message = Error.code + ": " + DBError.DBErrorCodeMap[Error.code || 'Unknown error'] || 'Unknown error';
+        this.stack = this.message;
+        this.table = Error.table;
+        this.detail = Error.detail;
+    }
+}
+
+
+
+
+export const ErrorCodes: Record<ErrorType, number> = {
+    BusinessError: 418,
+    InfrastructureError: 500,
+    DBError: 503
+}
+
+
+
