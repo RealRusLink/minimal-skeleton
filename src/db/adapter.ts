@@ -17,7 +17,6 @@ export type writeUserSecretFeedback =
     | { success: true }
     | { success: false, reason: "User doesn't exist" | "Wrong password" };
 
-
 export class DBAdapter {
     connection: DBConnector;
     config: Config;

@@ -1,7 +1,6 @@
 import {Pool} from "pg"
 import {type Config} from "../config.js";
 
-
 export class DBConnector {
     pool: Pool;
     constructor(GLOBAL_CONFIG: Config) {
@@ -29,4 +28,4 @@ export class DBConnector {
 }
 
 
-export default { dbConnection: DBConnector }
+export default { DBConnector }

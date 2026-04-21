@@ -6,42 +6,79 @@ import {type RoutersDeclaration, Routes} from "./routes/index.js";
 import {Api} from "./routes/api.js";
 import {Web} from "./routes/web.js";
 import {Server} from "./server.js";
+import {DBErrorTranslator} from "./errors/translators.js";
 
 
+const createBuilder = <T extends object>(instance: T, message: string): any => {
+    return new Proxy(instance, {
+        get(target, prop, receiver) {
+            if (prop === 'addTranslator') {
+                return (translatorFn: (obj: T) => T) => {
+                    Logger.important(`Initialised ${translatorFn.name} for ${target.constructor.name}`)
+                    return createBuilder(translatorFn(target), message);
+                };
+            }
 
+            if (prop === 'addLogger') {
+                return () => {
+                    const logged = Logger.setMultipleLoggers(target);
+                    return createBuilder(logged, message);
+                };
+            }
 
-const init = <T extends new (...args: any[]) => any>(
+            return Reflect.get(target, prop, receiver);
+        }
+    });
+};
+
+export const init = <T extends new (...args: any[]) => any>(
     BaseClass: T,
     message: string,
     ...args: ConstructorParameters<T>
-): InstanceType<T> => {
-    if (!IS_LOGGING_ENABLED) return new BaseClass(...args);
+): InstanceType<T> & {
+    addTranslator: (fn: (obj: InstanceType<T>) => InstanceType<T>) => InstanceType<T> & any,
+    addLogger: () => InstanceType<T> & any
+} => {
+    const WrappedClass = IS_LOGGING_ENABLED
+        ? Logger.wrapConstructor(BaseClass, {
+            customMessage: message,
+            customMessageLevel: "IMPORTANT"
+        })
+        : BaseClass;
 
-    const WrappedClass = Logger.wrapConstructor(BaseClass, {
-        customMessage: message,
-        customMessageLevel: "IMPORTANT"
-    });
-
-    return Logger.setMultipleLoggers(new WrappedClass(...args));
+    return createBuilder(new WrappedClass(...args), message);
 };
 
 const IS_LOGGING_ENABLED = true;
 
 const Logger = new LoggerService(consoleConfig)
-Logger.logLevel = "INFO"
+Logger.logLevel = "DEBUG"
+
+
 
 const GlobalConfig = init(Config, "Global configuration loaded");
 
-const DBConnection = init(DBConnector, "DB pool connected", GlobalConfig);
+const DBConnection = init(DBConnector, "DB pool connected", GlobalConfig)
+    .addTranslator(DBErrorTranslator)
+    .addLogger();
+
 await DBConnection.verifyConnection();
 
-const DBApi = init(DBAdapter, "DB adapter initialised", DBConnection, GlobalConfig);
+const DBApi = init(DBAdapter, "DB adapter initialised", DBConnection, GlobalConfig)
+    .addTranslator(DBErrorTranslator)
+    .addLogger();
 
 const routersDeclaration: RoutersDeclaration = [
-    { router: init(Api, "Api routes initialised", DBApi, GlobalConfig), path: "/api" },
-    { router: init(Web, "Web routes initialised", GlobalConfig), path: "/" }
+    {
+        router: init(Api, "Api routes initialised", DBApi, GlobalConfig).addLogger(),
+        path: "/api"
+    },
+    {
+        router: init(Web, "Web routes initialised", GlobalConfig).addLogger(),
+        path: "/"
+    }
 ];
 
-const AppRoutes = init(Routes, "All routes registered", routersDeclaration);
+const AppRoutes = init(Routes, "All routes registered", routersDeclaration).addLogger();
 
-const AppServer = init(Server, `Server is listening on ${GlobalConfig.listenPort}`, AppRoutes, GlobalConfig)
+const AppServer = init(Server, `Server started on port ${GlobalConfig.listenPort}`, AppRoutes, GlobalConfig).addLogger();
