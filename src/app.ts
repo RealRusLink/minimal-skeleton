@@ -11,8 +11,9 @@ const LoggedDBConnector = Logger.wrapConstructor(DBConnector, {customMessage: "D
 const LoggedDBAdapter = Logger.wrapConstructor(DBAdapter, {customMessage: "DB adapter initialised", customMessageLevel: "IMPORTANT"})
 
 
-const GlobalConfig = new LoggedConfig()
-const DBConnection = new LoggedDBConnector(GlobalConfig)
+const GlobalConfig = Logger.setMultipleLoggers(new LoggedConfig())
+const DBConnection = Logger.setMultipleLoggers(new LoggedDBConnector(GlobalConfig))
+await DBConnection.verifyConnection()
 const DBApi = new LoggedDBAdapter(DBConnection, GlobalConfig)
 
 
