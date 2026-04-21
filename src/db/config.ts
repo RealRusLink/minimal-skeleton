@@ -12,7 +12,6 @@ export class DBConnector {
             database: GLOBAL_CONFIG.db.name,
             password: GLOBAL_CONFIG.db.password,
             max: 10,
-            connectionTimeoutMillis: 3000,
             idleTimeoutMillis: 30000
         })
     }
