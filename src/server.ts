@@ -7,6 +7,7 @@ import type {Config} from "./config.js";
  * It uses the @hono/node-server adapter to run the Hono application in a Node.js environment.
  */
 export class Server {
+    private instance: ReturnType<typeof serve>
     /**
      * Starts the HTTP server.
      * It expects an instance of the Routes class (containing all registered middleware and endpoints)
@@ -14,9 +15,17 @@ export class Server {
      * implementation to handle incoming requests.
      */
     constructor(AppRoutes: Routes, GlobalConfig: Config) {
-        serve({
+        this.instance = serve({
             fetch: AppRoutes.fetch,
             port: GlobalConfig.listenPort
         })
     }
+
+    /**
+     * Method for server shutdown
+     */
+    stop(){
+        this.instance.close()
+    }
+
 }

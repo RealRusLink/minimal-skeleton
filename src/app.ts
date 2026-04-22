@@ -156,3 +156,28 @@ Logger.important("Registered global error handling")
  * Binds the assembled application to the network port and starts listening for HTTP requests.
  */
 const AppServer = init(Server, `Server started on port ${GlobalConfig.listenPort}`, AppRoutes, GlobalConfig).addLogger();
+
+
+/**
+ * Server shutdown handler
+ */
+const shutdown = async () => {
+    Logger.important("Received shutdown signal. Starting graceful shutdown...");
+    AppServer.stop();
+    Logger.important("HTTP server stopped accepting new connections.");
+
+    try {
+        await DBConnection.pool.end();
+        Logger.important("Database pool successfully closed.");
+        process.exit(0);
+    } catch (err) {
+        Logger.error(`Error during graceful shutdown: ${err}`);
+        process.exit(1);
+    }
+};
+
+/**
+ * Shutdown listener
+ */
+process.on('SIGINT', shutdown);
+process.on("exit", () => Logger.important("Server closed."))
