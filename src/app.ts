@@ -2,11 +2,12 @@ import {LoggerService, consoleConfig} from "../../logger/dist/index.js"
 import {Config} from "./config.js";
 import {DBConnector} from "./db/config.js";
 import {DBAdapter} from "./db/adapter.js";
-import {type RoutersDeclaration, Routes} from "./routes/index.js";
+import {type MiddlewareDeclaration, type RoutersDeclaration, Routes} from "./routes/index.js";
 import {Api} from "./routes/api.js";
 import {Web} from "./routes/web.js";
 import {Server} from "./server.js";
 import {DBErrorTranslator} from "./errors/translators.js";
+import {LoggerMiddleware} from "./routes/middleware.js";
 
 
 const createBuilder = <T extends object>(instance: T, message: string): any => {
@@ -42,7 +43,7 @@ export const init = <T extends new (...args: any[]) => any>(
     const WrappedClass = IS_LOGGING_ENABLED
         ? Logger.wrapConstructor(BaseClass, {
             customMessage: message,
-            customMessageLevel: "IMPORTANT"
+            customMessageLevel: "IMPORTANT",
         })
         : BaseClass;
 
@@ -52,7 +53,7 @@ export const init = <T extends new (...args: any[]) => any>(
 const IS_LOGGING_ENABLED = true;
 
 const Logger = new LoggerService(consoleConfig)
-Logger.logLevel = "DEBUG"
+Logger.logLevel = "TRACE"
 
 
 
@@ -79,6 +80,13 @@ const routersDeclaration: RoutersDeclaration = [
     }
 ];
 
-const AppRoutes = init(Routes, "All routes registered", routersDeclaration).addLogger();
+const middlewareDeclaration: MiddlewareDeclaration = [
+    {
+        middlewareClass: init(LoggerMiddleware, "Logging middleware initialised", Logger),
+        path: "*"
+    }
+]
+
+const AppRoutes = init(Routes, "All routes and middleware registered", routersDeclaration, middlewareDeclaration).addLogger();
 
 const AppServer = init(Server, `Server started on port ${GlobalConfig.listenPort}`, AppRoutes, GlobalConfig).addLogger();
