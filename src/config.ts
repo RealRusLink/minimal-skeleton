@@ -18,9 +18,15 @@ interface ConfigIF{
 
 const ConfigBase = class {} as new () => ConfigIF
 
+/**
+ * Loads environment variables into a structured configuration object and validates presence of all values.
+ */
 export class Config extends ConfigBase{
 
 
+    /**
+     * Initializes configuration by parsing .env and mapping environment variables to class properties.
+     */
     constructor() {
         dotenv.config({quiet: true})
         super()
@@ -43,6 +49,9 @@ export class Config extends ConfigBase{
     }
 
 
+    /**
+     * Recursively traverses the configuration object to ensure no values are empty, null, or undefined.
+     */
     checkConfig
     (obj:
      Record<string, any>,

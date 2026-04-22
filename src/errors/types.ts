@@ -1,8 +1,15 @@
 import {DatabaseError} from "pg";
 import type {ContentfulStatusCode, StatusCode} from "hono/utils/http-status"
+
+/**
+ * Valid error categories used for classifying application failures and determining HTTP response codes.
+ */
 export type ErrorType = "BusinessError" | "InfrastructureError" | "DBError" | "Unknown"
 
 
+/**
+ * Base class for all application-specific exceptions.
+ */
 export  class AppError extends Error{
     type: ErrorType = "Unknown";
     constructor() {
@@ -11,6 +18,9 @@ export  class AppError extends Error{
 }
 
 
+/**
+ * Represents errors caused by invalid business logic or client-side input.
+ */
 export class BusinessError extends AppError{
     type: ErrorType = "BusinessError";
     constructor() {
@@ -19,6 +29,9 @@ export class BusinessError extends AppError{
     }
 }
 
+/**
+ * Represents general infrastructure-level failures (e.g., service unavailability).
+ */
 export class InfrastructureError extends AppError{
     type: ErrorType = "InfrastructureError"
     constructor() {
@@ -28,7 +41,14 @@ export class InfrastructureError extends AppError{
 
 
 
+/**
+ * Specialized infrastructure error for PostgreSQL failures.
+ * It maps raw PG error codes to human-readable messages and preserves database context like table names and details.
+ */
 export class DBError extends InfrastructureError{
+    /**
+     * Dictionary mapping PostgreSQL state codes to descriptive error messages.
+     */
     static DBErrorCodeMap: Record<string, string> = {
         '08000': 'Connection exception',
         '08003': 'Connection does not exist',
@@ -59,6 +79,10 @@ export class DBError extends InfrastructureError{
     table: string | undefined;
     detail: string | undefined;
     hiddenStack: string;
+
+    /**
+     * Creates a DBError instance from a raw PostgreSQL DatabaseError, populating metadata and formatting the message.
+     */
     constructor(Error: DatabaseError) {
         super();
         this.type = "DBError"
@@ -74,12 +98,12 @@ export class DBError extends InfrastructureError{
 
 
 
+/**
+ * Map of ErrorType categories to their corresponding HTTP status codes for API responses.
+ */
 export const ErrorCodes: Record<ErrorType, ContentfulStatusCode> = {
     BusinessError: 418,
     InfrastructureError: 500,
     DBError: 503,
     Unknown: 500
 }
-
-
-
