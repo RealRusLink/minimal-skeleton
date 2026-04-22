@@ -7,7 +7,7 @@ import {Api} from "./routes/api.js";
 import {Web} from "./routes/web.js";
 import {Server} from "./server.js";
 import {DBErrorTranslator} from "./errors/translators.js";
-import {LoggerMiddleware} from "./routes/middleware.js";
+import {errorHandler, LoggerMiddleware} from "./routes/middleware.js";
 
 
 const createBuilder = <T extends object>(instance: T, message: string): any => {
@@ -83,10 +83,13 @@ const routersDeclaration: RoutersDeclaration = [
 const middlewareDeclaration: MiddlewareDeclaration = [
     {
         middlewareClass: init(LoggerMiddleware, "Logging middleware initialised", Logger),
-        path: "*"
-    }
+        path: "*",
+    },
 ]
 
 const AppRoutes = init(Routes, "All routes and middleware registered", routersDeclaration, middlewareDeclaration).addLogger();
+
+AppRoutes.onError(errorHandler)
+Logger.important("Registered global error handling")
 
 const AppServer = init(Server, `Server started on port ${GlobalConfig.listenPort}`, AppRoutes, GlobalConfig).addLogger();
