@@ -1,5 +1,5 @@
 import {type Context, type MiddlewareHandler, type Next} from "hono";
-import {type LoggerService} from "../../../logger/dist/index.js"
+import {type LoggerService} from "logger/dist/index.js"
 import {AppError, ErrorCodes} from "../errors/types.js";
 
 

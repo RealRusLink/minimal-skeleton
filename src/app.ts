@@ -1,4 +1,4 @@
-import {LoggerService, consoleConfig} from "../../logger/dist/index.js"
+import {LoggerService, consoleConfig} from "logger/dist/index.js"
 import {Config} from "./config.js";
 import {DBConnector} from "./db/config.js";
 import {DBAdapter} from "./db/adapter.js";
