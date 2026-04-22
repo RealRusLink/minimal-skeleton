@@ -1,5 +1,4 @@
 import {Hono} from "hono";
-import {type MiddlewareHandler} from "hono";
 import type {Middleware} from "./middleware.js";
 
 export type RoutersDeclaration<T extends Hono = Hono> =
