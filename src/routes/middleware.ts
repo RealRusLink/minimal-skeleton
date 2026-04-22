@@ -28,3 +28,8 @@ export class LoggerMiddleware extends Middleware{
 
 
 }
+
+export function errorHandler (err: Error, c: Context){
+    if (err instanceof AppError) return c.text(err.message, ErrorCodes[err.type])
+    return c.text("Unknown error", 500)
+}
