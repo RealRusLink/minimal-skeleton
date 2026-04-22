@@ -1,15 +1,25 @@
 import {DatabaseError} from "pg";
+import type {ContentfulStatusCode, StatusCode} from "hono/utils/http-status"
+export type ErrorType = "BusinessError" | "InfrastructureError" | "DBError" | "Unknown"
 
-export type ErrorType = "BusinessError" | "InfrastructureError" | "DBError"
 
-export class BusinessError extends Error{
-    type: ErrorType = "BusinessError";
+export  class AppError extends Error{
+    type: ErrorType = "Unknown";
     constructor() {
         super();
     }
 }
 
-export class InfrastructureError extends Error{
+
+export class BusinessError extends AppError{
+    type: ErrorType = "BusinessError";
+    constructor() {
+        super();
+        this.stack = "BusinessError " + this.stack
+    }
+}
+
+export class InfrastructureError extends AppError{
     type: ErrorType = "InfrastructureError"
     constructor() {
         super();
@@ -64,10 +74,11 @@ export class DBError extends InfrastructureError{
 
 
 
-export const ErrorCodes: Record<ErrorType, number> = {
+export const ErrorCodes: Record<ErrorType, ContentfulStatusCode> = {
     BusinessError: 418,
     InfrastructureError: 500,
-    DBError: 503
+    DBError: 503,
+    Unknown: 500
 }
 
 
