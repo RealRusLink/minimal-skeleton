@@ -1,4 +1,4 @@
-import {LoggerService, consoleConfig} from "logger/dist/index.js"
+import {LoggerService, consoleConfig, type logLevel, type logSilent} from "logger/dist/index.js"
 import {Config} from "./config.js";
 import {DBConnector} from "./db/config.js";
 import {DBAdapter} from "./db/adapter.js";
@@ -10,31 +10,40 @@ import {DBErrorTranslator} from "./errors/translators.js";
 import {errorHandler, LoggerMiddleware} from "./routes/middleware.js";
 
 /**
- * Higher-order utility that implements an interface via Proxy.
- * It decorates class instances with additional capabilities like error translation and automatic logging.
+ * A Proxy-based builder that does component decoration.
+ * It encapsulates the 'logRule' state to ensure that logging levels
+ * are inherited correctly across all decoration stages.
  */
-const createBuilder = <T extends object>(instance: T, message: string): any => {
+const createBuilder = <T extends object>(instance: T, message: string, logRule?: logLevel | logSilent): any => {
     return new Proxy(instance, {
         get(target, prop, receiver) {
             /**
-             * Wraps the instance with a specialized error translator.
-             * Primarily used for database layers to convert raw driver exceptions into domain-specific errors.
+             * Wraps the current instance with an error translation function.
+             * This maintains the builder pattern by returning a new Proxy that carries
+             * the original instance's logging context.
              */
             if (prop === 'addTranslator') {
                 return (translatorFn: (obj: T) => T) => {
                     Logger.important(`Initialised ${translatorFn.name} for ${target.constructor.name}`)
-                    return createBuilder(translatorFn(target), message);
+                    return createBuilder(translatorFn(target), message, logRule);
                 };
             }
 
             /**
-             * Enables method-level logging for the entire instance.
-             * Uses LoggerService.setMultipleLoggers to wrap every class method with entry/exit logs, argument serialization, and execution timing.
+             * Dynamically injects logging into all instance methods.
+             * * Hierarchy of Log Level Resolution:
+             * 1. Explicit: The 'level' argument passed directly to .addLogger(level).
+             * 2. Component-specific: The 'logRule' provided during the init() call.
+             * 3. Global: The current 'Logger.logLevel' value (dynamic fallback).
              */
             if (prop === 'addLogger') {
-                return () => {
-                    const logged = Logger.setMultipleLoggers(target);
-                    return createBuilder(logged, message);
+                return (level?: logLevel | logSilent) => {
+                    // Logic: If no specific level is provided here or in init(),
+                    // we fall back to the logger's current global state.
+                    const effectiveLevel = level ?? logRule ?? Logger.logLevel;
+
+                    const logged = Logger.setMultipleLoggers(target, effectiveLevel);
+                    return createBuilder(logged, message, effectiveLevel);
                 };
             }
 
@@ -44,129 +53,111 @@ const createBuilder = <T extends object>(instance: T, message: string): any => {
 };
 
 /**
- * Universal initialization factory that manages the lifecycle of application components.
- * It handles constructor wrapping for logging, instantiation, and returns a Proxy-builder for further decoration.
- *
- * **The initialization process follows this logic:**
- * - Constructor Wrapping: If IS_LOGGING_ENABLED is true, the class constructor is intercepted to log its call.
- * - Execution: A new instance is created with the provided arguments.
- * - Decoration: The instance is wrapped in a Proxy to support .addLogger() and .addTranslator() calls.
- * - Feedback: A custom completion message is logged at the IMPORTANT level.
+ * The primary entry point for class instantiation.
+ * Handles wrapping of constructors to ensure class creation is visible in logs.
+ * * @param BaseClass - The class to be instantiated.
+ * @param settings.message - A descriptive message logged upon successful instantiation.
+ * @param settings.logRule - Optional. Sets a specific logging priority for this class.
+ * @param args - Constructor parameters for the BaseClass.
  */
 export const init = <T extends new (...args: any[]) => any>(
     BaseClass: T,
-    message: string,
+    settings: { message: string, logRule?: logLevel | logSilent },
     ...args: ConstructorParameters<T>
 ): InstanceType<T> & {
     addTranslator: (fn: (obj: InstanceType<T>) => InstanceType<T>) => InstanceType<T> & any,
-    addLogger: () => InstanceType<T> & any
+    addLogger: (level?: logLevel | logSilent) => InstanceType<T> & any
 } => {
+    const { message, logRule } = settings;
+
+    /**
+     * Decorates the constructor. If IS_LOGGING_ENABLED is true,
+     * it logs class creation at the IMPORTANT level.
+     */
     const WrappedClass = IS_LOGGING_ENABLED
         ? Logger.wrapConstructor(BaseClass, {
             customMessage: message,
             customMessageLevel: "IMPORTANT",
+            customLogRule: logRule || Logger.logLevel
         })
         : BaseClass;
 
-    return createBuilder(new WrappedClass(...args), message);
+    const instance = new WrappedClass(...args);
+    return createBuilder(instance, message, logRule);
 };
 
 const IS_LOGGING_ENABLED = true;
 
 /**
- * Global Logger initialization using pre-defined console configuration.
- * CAUTION: TRACE level may leak private data.
+ * Initialize global logger.
+ * CAUTION: "TRACE level may expose private data as it logs function arguments and result"
  */
 const Logger = new LoggerService(consoleConfig)
 Logger.logLevel = "TRACE"
 
 
 /**
- * SERVER BOOTSTRAP LIFECYCLE
- * * Configuration Loading:
- * Loads environment variables and validates that all required fields are present in the Config object.
+ * BOOTSTRAP SEQUENCE
  */
-const GlobalConfig = init(Config, "Global configuration loaded");
 
-/**
- * Database Connectivity:
- * Initializes the DBConnector with pool settings. It adds a DBErrorTranslator to handle pg-driver errors
- * and enables method logging for the connection manager.
- */
-const DBConnection = init(DBConnector, "DB pool connected", GlobalConfig)
+// Load configuration to add dependencies.
+const GlobalConfig = init(Config, { message: "Global configuration loaded", logRule: "DEBUG" });
+
+// Create database connection
+const DBConnection = init(DBConnector, { message: "DB pool connected", logRule: "DEBUG" }, GlobalConfig)
     .addTranslator(DBErrorTranslator)
     .addLogger();
 
-/**
- * Connection Verification:
- * Asynchronously checks database availability before proceeding to route initialization.
- */
+// Ensure the database is live before attempting to build routing adapters.
 await DBConnection.verifyConnection();
 
-/**
- * Data Access Layer:
- * Creates the DBAdapter which contains business-related queries. It is also decorated with
- * error translation and logging capabilities.
- */
-const DBApi = init(DBAdapter, "DB adapter initialised", DBConnection, GlobalConfig)
+// Initialize the primary Data Access Layer with DEBUG visibility.
+const DBApi = init(DBAdapter, { message: "DB adapter initialised", logRule: "DEBUG" }, DBConnection, GlobalConfig)
     .addTranslator(DBErrorTranslator)
     .addLogger();
 
-/**
- * Sub-Routers Declaration:
- * Initializes API and Web routers, applying logging to each, and maps them to their respective URL paths.
- */
+// Declare sub-routers for API and Web domains.
 const routersDeclaration: RoutersDeclaration = [
     {
-        router: init(Api, "Api routes initialised", DBApi, GlobalConfig).addLogger(),
+        router: init(Api, { message: "Api routes initialised" }, DBApi, GlobalConfig).addLogger(),
         path: "/api"
     },
     {
-        router: init(Web, "Web routes initialised", GlobalConfig).addLogger(),
+        router: init(Web, { message: "Web routes initialised" }, GlobalConfig).addLogger(),
         path: "/"
     }
 ];
 
-/**
- * Middleware Registration:
- * Sets up global middlewares, such as LoggerMiddleware, which will run for all incoming requests.
- */
+// Register global middlewares.
 const middlewareDeclaration: MiddlewareDeclaration = [
     {
-        middlewareClass: init(LoggerMiddleware, "Logging middleware initialised", Logger),
+        middlewareClass: init(LoggerMiddleware, { message: "Logging middleware initialised" }, Logger),
         path: "*",
     },
 ]
 
-/**
- * Main Application Assembly:
- * Uses the Routes class to combine all routers and middlewares into a single Hono application instance.
- */
-const AppRoutes = init(Routes, "All routes and middleware registered", routersDeclaration, middlewareDeclaration).addLogger();
-
-/**
- * Error Handling:
- * Attaches the global errorHandler to the Hono instance to manage AppErrors and unknown exceptions.
- */
+// Assemble the final routing tree and attach global exception handling.
+const AppRoutes = init(Routes, { message: "All routes and middleware registered" }, routersDeclaration, middlewareDeclaration).addLogger();
 AppRoutes.onError(errorHandler)
 Logger.important("Registered global error handling")
 
-/**
- * Server Start:
- * Binds the assembled application to the network port and starts listening for HTTP requests.
- */
-const AppServer = init(Server, `Server started on port ${GlobalConfig.listenPort}`, AppRoutes, GlobalConfig).addLogger();
+// Run server.
+const AppServer = init(Server, { message: `Server started on port ${GlobalConfig.listenPort}` }, AppRoutes, GlobalConfig).addLogger();
 
 
 /**
- * Server shutdown handler
+ * Graceful shutdown.
+ * Ensures the process exits only after closing active network listeners and DB pools.
  */
 const shutdown = async () => {
     Logger.important("Received shutdown signal. Starting graceful shutdown...");
+
+    // Stop the server instance to prevent new incoming traffic.
     AppServer.stop();
     Logger.important("HTTP server stopped accepting new connections.");
 
     try {
+        // Gracefully close the database pool once current queries finish.
         await DBConnection.pool.end();
         Logger.important("Database pool successfully closed.");
         process.exit(0);
@@ -176,8 +167,6 @@ const shutdown = async () => {
     }
 };
 
-/**
- * Shutdown listener
- */
+// Monitor OS signals for termination.
 process.on('SIGINT', shutdown);
-process.on("exit", () => Logger.important("Server closed."))
+process.on("exit", () => Logger.important("Server closed."));
