@@ -7,18 +7,14 @@
   "type": "module",
   "main": "app.ts",
   "scripts": {
-    "test": "vitest run",
-    "test:db": "vitest",
     "build": "tsc -p tsconfig.json",
     "start": "node ./dist/app.js",
-    "fast": "npm run build && timeout 5 && npm run start",
-    "clearn": "powershell -Command \"Get-ChildItem -Path ./src -Include *.js -Recurse | Remove-Item -Force\""
+    "clear": "powershell -Command \"Get-ChildItem -Path ./src -Include *.js -Recurse | Remove-Item -Force\""
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
     "@types/pg": "^8.20.0",
-    "typescript": "^6.0.2",
-    "vitest": "^4.1.4"
+    "typescript": "^6.0.2"
   },
   "dependencies": {
     "@hono/node-server": "^2.0.0",
